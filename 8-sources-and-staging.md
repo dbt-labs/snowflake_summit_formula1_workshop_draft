@@ -329,6 +329,6 @@ The next step is to set up the staging models for each of the 8 source tables. G
 
     <Lightbox src="/img/guides/dbt-ecosystem/dbt-python-snowpark/8-sources-and-staging/4-confirm-models.png" title="Confirm models"/>
 
-    Before we move onto the next section, be sure to commit your new models to your Git branch. Click **Commit and push** and give your commit a message like `profile, sources, and staging setup` before moving on.
+    Before we move onto the next section, be sure to commit your new models to your Git branch. Click **Commit and sync** and give your commit a message like `profile, sources, and staging setup` before moving on.
 
     
