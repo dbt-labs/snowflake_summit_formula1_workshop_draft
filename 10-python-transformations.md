@@ -12,7 +12,7 @@ There are quite a few differences between SQL and Python in terms of the dbt syn
 
 First, we want to find out: which constructor had the fastest pit stops in 2021? (constructor is a Formula 1 team that builds or “constructs” the car).
 
-1. Create a new file called `fastest_pit_stops_by_constructor.py` in our `aggregates` (this is the first time we are using the `.py` extension!).
+1. Create a new file called `fastest_pit_stops_by_constructor.py` in our `aggregates` folder (this is the first time we are using the `.py` extension!).
 2. Copy the following code into the file:
     ```python 
     import numpy as np
@@ -37,22 +37,14 @@ First, we want to find out: which constructor had the fastest pit stops in 2021?
         return fastest_pit_stops.round(2)
     ```
 
-3. Let’s break down what this code is doing step by step:
-    - First, we are importing the Python libraries that we are using. A *library* is a reusable chunk of code that someone else wrote that you may want to include in your programs/projects. We are using `numpy` and `pandas`in this Python model. This is similar to a dbt *package*, but our Python libraries do *not* persist across the entire project.
-    - Defining a function called `model` with the parameter `dbt` and `session`. The parameter `dbt` is a class compiled by dbt, which enables you to run your Python code in the context of your dbt project and DAG. The parameter `session` is a class representing your Snowflake’s connection to the Python backend. The `model` function *must return a single DataFrame*. You can see that all the data transformation happening is within the body of the `model` function that the `return` statement is tied to.
+3. Let’s break down what this code is doing:
+    - First, we are importing the Python libraries that we are using. This is similar to a dbt *package*, but our Python libraries do *not* persist across the entire project.
+    - Defining a function called `model` with the parameter `dbt` and `session`. We'll define these more in depth later in this section. You can see that all the data transformation happening is within the body of the `model` function that the `return` statement is tied to.
     - Then, within the context of our dbt model library, we are passing in a configuration of which packages we need using `dbt.config(packages=["pandas","numpy"])`.
-    - Use the `.ref()` function to retrieve the data frame `pit_stops_joined` that we created in our last step using SQL. We cast this to a pandas dataframe (by default it's a Snowpark Dataframe).
+    - Use the `.ref()` function to retrieve the upstream data frame `pit_stops_joined` that we created in our last step using SQL. We cast this to a pandas dataframe (by default it's a Snowpark Dataframe).
+    - From there we are using python to transform our dataframe to give us a statistical summary by using `describe()` across the `CONSTRUCTOR_NAME`. 
     - Create a variable named `year` so we aren’t passing a hardcoded value.
-    - Generate a new column called `PIT_STOP_SECONDS` by dividing the value of `PIT_STOP_MILLISECONDS` by 1000.
-    - Create our final data frame `fastest_pit_stops` that holds the records where year is equal to our year variable (2021 in this case), then group the data frame by `CONSTRUCTOR_NAME` and use the `describe()` and `sort_values()` and in descending order. This will make our first row in the new aggregated data frame the team with the fastest pit stops over an entire competition year.
-    - Finally, it resets the index of the `fastest_pit_stops` data frame. The `reset_index()` method allows you to reset the index back to the default 0, 1, 2, etc indexes. By default, this method will keep the "old" indexes in a column named "index"; to avoid this, use the drop parameter. Think of this as keeping your data “flat and square” as opposed to “tiered”. If you are new to Python, now might be a good time to [learn about indexes for 5 minutes](https://towardsdatascience.com/the-basics-of-indexing-and-slicing-python-lists-2d12c90a94cf) since it's the foundation of how Python retrieves, slices, and dices data. The `inplace` argument means we override the existing data frame permanently. Not to fear! This is what we want to do to avoid dealing with multi-indexed dataframes!
-    - Convert our Python column names to all uppercase using `.upper()`, so Snowflake recognizes them.
-    - Finally we are returning our dataframe with 2 decimal places for all the columns using the `round()` method.
-4. Zooming out a bit, what are we doing differently here in Python from our typical SQL code:
-    - Method chaining is a technique in which multiple methods are called on an object in a single statement, with each method call modifying the result of the previous one. The methods are called in a chain, with the output of one method being used as the input for the next one. The technique is used to simplify the code and make it more readable by eliminating the need for intermediate variables to store the intermediate results.
-        - The way you see method chaining in Python is the syntax `.().()`. For example, `.describe().sort_values(by='mean')` where the `.describe()` method is chained to `.sort_values()`.
-    - The `.describe()` method is used to generate various summary statistics of the dataset. It's used on pandas dataframe. It gives a quick and easy way to get the summary statistics of your dataset without writing multiple lines of code.
-    - The `.sort_values()` method is used to sort a pandas dataframe or a series by one or multiple columns. The method sorts the data by the specified column(s) in ascending or descending order. It is the pandas equivalent to `order by` in SQL.
+    - Convert our Python column names to all uppercase using `.upper()`, so Snowflake recognizes them. This has been a frequent "gotcha" for folks using dbt python so we call it out here. 
 
     We won’t go as in depth for our subsequent scripts, but will continue to explain at a high level what new libraries, functions, and methods are doing.
 
@@ -140,11 +132,12 @@ Let’s take a step back before starting machine learning to both review and go 
 - `.config()`. Just like SQL models, there are three ways to configure Python models:
     - In a dedicated `.yml` file, within the `models/` directory
     - Within the model's `.py` file, using the `dbt.config()` method
-    - Calling the `dbt.config()` method will set configurations for your model within your `.py` file, similar to the `{{ config() }} macro` in `.sql` model files:
+    - Calling the `dbt.config()` method will set configurations for your model within your `.py` file, similar to the `{{ config() }} macro` in `.sql` model files. There's a limit to how complex you can get with the `dbt.config()` method. It accepts only literal values (strings, booleans, and numeric types). Passing another function or a more complex data structure is not possible. The reason is that dbt statically analyzes the arguments to `.config()` while parsing your model without executing your Python code. If you need to set a more complex configuration, we recommend you define it using the config property in a [YAML file](/reference/resource-properties/config). Learn more about configurations [here](/reference/model-configs).
         ```python 
         def model(dbt, session):
 
         # setting configuration
         dbt.config(materialized="table")
         ```
-    - There's a limit to how complex you can get with the `dbt.config()` method. It accepts only literal values (strings, booleans, and numeric types). Passing another function or a more complex data structure is not possible. The reason is that dbt statically analyzes the arguments to `.config()` while parsing your model without executing your Python code. If you need to set a more complex configuration, we recommend you define it using the config property in a [YAML file](/reference/resource-properties/config). Learn more about configurations [here](/reference/model-configs).
+
+Now that we understand how to create python transformations we can use them to prepare our data for machine learning!

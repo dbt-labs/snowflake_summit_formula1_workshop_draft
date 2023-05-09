@@ -4,7 +4,7 @@ id: "12-machine-learning-training-prediction"
 description: "Machine Learning: training and prediction"
 ---
 
-We’re ready to start training a model to predict the driver’s position. Now is a good time to pause and take a step back and say, usually in ML projects you’ll try multiple algorithms during development and use an evaluation method such as cross validation to determine which algorithm to use. You can definitely do this in your dbt project, but for the content of this lab we’ll have decided on using a logistic regression to predict position (we actually tried some other algorithms using cross validation outside of this lab such as k-nearest neighbors and a support vector classifier but that didn’t perform as well as the logistic regression and a decision tree that overfit).
+We’re ready to start training a model to predict the driver’s position. During the ML development phase you’ll try multiple algorithms and use an evaluation method such as cross validation to determine which algorithm to use. You can definitely use dbt if you want to save and reproduce dataframes from your ML development and model selection process, but for the content of this lab we’ll have skipped ahead decided on using a logistic regression to predict position (we actually tried some other algorithms using cross validation outside of this lab such as k-nearest neighbors and a support vector classifier but that didn’t perform as well as the logistic regression and a decision tree that overfit). By doing this we won't have to make code changes between development and deployment today. 
 
 There are 3 areas to break down as we go since we are working at the intersection all within one model file:
 1. Machine Learning
@@ -15,8 +15,8 @@ If you haven’t seen code like this before or use joblib files to save machine 
 
 ## Training and saving a machine learning model
 
-1. Project organization remains key, so let’s make a new subfolder called `train_predict` under the `ml` folder.
-2. Now create a new file called `train_test_position` and copy and save the following code:
+1. Project organization remains key, so let’s make a new subfolder called `train_predict.py` under the `ml` folder.
+2. Now create a new file called `train_test_position.py` and copy and save the following code:
 
     ```python 
     import snowflake.snowpark.functions as F
@@ -97,7 +97,7 @@ If you haven’t seen code like this before or use joblib files to save machine 
     - We’re importing some helpful libraries.
         - Defining a function called `save_file()` that takes four parameters: `session`, `model`, `path` and `dest_filename` that will save our logistic regression model file.
             - `session` &mdash; an object representing a connection to Snowflake.
-            - `model` &mdash; an object that needs to be saved. In this case, it's a Python object that is a scikit-learn that can be serialized with joblib.
+            - `model` &mdash; when models are trained they are saved in memory, we will be using the model name to save our in-memory model into a joblib file to retrieve to call new predictions later.
             - `path` &mdash; a string representing the directory or bucket location where the file should be saved.
             - `dest_filename` &mdash; a string representing the desired name of the file.
         - Creating our dbt model
@@ -114,18 +114,18 @@ If you haven’t seen code like this before or use joblib files to save machine 
 5. Viewing our output of this model:
   <Lightbox src="/img/guides/dbt-ecosystem/dbt-python-snowpark/12-machine-learning-training-prediction/1-preview-train-test-position.png" title="Preview which rows of our model were used for training and testing"/>
 
-6. Let’s pop back over to Snowflake and check that our logistic regression model has been stored in our `MODELSTAGE` using the command:
+6. Let’s pop back over to Snowflake and check that our logistic regression model has been stored in our `MODELSTAGE`. Make sure you are in the correct database and development schema to view your stage (this should be `PC_DBT_DB` and your dev schema - for example `dbt_hwatson`):
     ```sql
     list @modelstage
     ```
   <Lightbox src="/img/guides/dbt-ecosystem/dbt-python-snowpark/12-machine-learning-training-prediction/2-list-snowflake-stage.png" title="List the objects in our Snowflake stage to check for our logistic regression to predict driver position"/>
 
-7. To investigate the commands run as part of `train_test_position` script, navigate to Snowflake query history to view it **Activity > Query History**. We can view the portions of query that we wrote such as `create or replace stage MODELSTAGE`, but we also see additional queries that Snowflake uses to interpret python code.
+7. To investigate the commands run as part of `train_test_position` script, navigate to Snowflake query history to view it **Home button > Activity > Query History**. We can view the portions of query that we wrote such as `create or replace stage MODELSTAGE`, but we also see additional queries that Snowflake uses to interpret python code.
   <Lightbox src="/img/guides/dbt-ecosystem/dbt-python-snowpark/12-machine-learning-training-prediction/3-view-snowflake-query-history.png" title="View Snowflake query history to see how python models are run under the hood"/>
 
 ## Predicting on new data
 
-1. Create a new file called `predict_position` and copy and save the following code:
+1. Create a new file called `predict_position.py` and copy and save the following code:
     ```python
     import logging
     import joblib
@@ -222,7 +222,7 @@ If you haven’t seen code like this before or use joblib files to save machine 
     ```bash
     dbt run --select predict_position
     ```
-3. **Commit and push** our changes to keep saving our work as we go using the commit message `logistic regression model training and application` before moving on.
+3. **Commit and sync** our changes to keep saving our work as we go using the commit message `logistic regression model training and application` before moving on.
 4. At a high level in this script, we are:
     - Retrieving our staged logistic regression model
     - Loading the model in
@@ -236,7 +236,7 @@ If you haven’t seen code like this before or use joblib files to save machine 
         - TARGET_MODEL_DIR_PATH ➡️ /tmp/driver_position/ml_model
         - TARGET_LIB_PATH ➡️ /tmp/driver_position/lib
     - Provide a list of our feature columns that we used for model training and will now be used on new data for prediction.
-    - Next, we are creating our main function `register_udf_for_prediction(p_predictor ,p_session ,p_dbt):`. This function is used to register a user-defined function (UDF) that performs the machine learning prediction. It takes three parameters: `p_predictor` is an instance of the machine learning model, `p_session` is an instance of the Snowflake session, and `p_dbt` is an instance of the dbt library. The function creates a UDF named `predict_churn` which takes a pandas dataframe with the input features and returns a pandas series with the predictions.
+    - Next, we are creating our main function `register_udf_for_prediction(p_predictor ,p_session ,p_dbt):`. This function is used to register a user-defined function (UDF) that performs the machine learning prediction. It takes three parameters: `p_predictor` is an instance of the machine learning model, `p_session` is an instance of the Snowflake session, and `p_dbt` is an instance of the dbt library. The function creates a UDF named `predict_position` which takes a pandas dataframe with the input features and returns a pandas series with the predictions.
     - ⚠️ Pay close attention to the whitespace here. We are using a function within a function for this script.
     - We have 2 simple functions that are programmatically retrieving our file paths to first get our stored model out of our `MODELSTAGE` and downloaded into the session `download_models_and_libs_from_stage` and then to load the contents of our model in (parameters) in `load_model` to use for prediction.
     - Take the model we loaded in and call it `predictor` and wrap it in a UDF.

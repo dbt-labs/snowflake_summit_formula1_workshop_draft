@@ -8,7 +8,7 @@ Now that we have all our sources and staging models done, it's time to move into
 
 We need to:
 
-- Create some intermediate tables to join tables that aren’t hierarchical
+- Create some intermediate tables to join tables that are hierarchical
 - Create core tables for business intelligence (BI) tool ingestion
 - Answer the two questions about:
     - fastest pit stops
